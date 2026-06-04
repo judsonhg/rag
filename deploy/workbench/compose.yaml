@@ -91,7 +91,7 @@ services:
   page-elements:
     image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemotron-page-elements-v3}:${YOLOX_TAG:-1.8.0}
     ports:
-      - "8000:8000"
+      - "18000:8000"
       - "8001:8001"
       - "8002:8002"
     user: root
