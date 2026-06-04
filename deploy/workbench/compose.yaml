@@ -12,6 +12,7 @@ services:
     - "8000"
     environment:
       NGC_API_KEY: ${NGC_API_KEY}
+      NIM_MODEL_PROFILE: ${NIM_MODEL_PROFILE:-a89dbe9ec9ba8b77837d6c9586bde67a261c66fc8cac454b06f9eb93ff7ebbd2}
       NIM_ENABLE_CHUNKED_PREFILL: "1"
       NIM_KV_CACHE_DTYPE: "fp8"
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
@@ -21,8 +22,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              #count: ${INFERENCE_GPU_COUNT:-all}
-              device_ids: ['${LLM_MS_GPU_ID:-1}', '${LLM_MS_GPU_ID2:-2}']
+              device_ids: ["${LLM_MS_GPU_ID:-4}", "${LLM_MS_GPU_ID2:-5}"]
               capabilities: [gpu]
     healthcheck:
       test: ["CMD", "python3", "-c", "import requests; requests.get('http://localhost:8000/v1/health/ready')"]
@@ -42,6 +42,7 @@ services:
     - "8000"
     environment:
       NGC_API_KEY: ${NGC_API_KEY}
+      CUDA_VISIBLE_DEVICES: "4,5"
       NIM_TRT_ENGINE_HOST_CODE_ALLOWED: 1
     user: "${USERID}"
     shm_size: 16GB
@@ -72,6 +73,7 @@ services:
     - "8000"
     environment:
       NGC_API_KEY: ${NGC_API_KEY}
+      CUDA_VISIBLE_DEVICES: "4,5"
     user: "${USERID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/v1/health/ready"]
