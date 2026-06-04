@@ -1,7 +1,7 @@
 <h1>NVIDIA RAG Blueprint</h1>
 
 Retrieval-Augmented Generation (RAG) combines the reasoning power of large language models (LLMs)
-with real-time retrieval from trusted data sources.
+with real-time retrieval from trusted data sources for TCAT. 
 It grounds AI responses in enterprise knowledge,
 reducing hallucinations and ensuring accuracy, compliance, and freshness.
 
