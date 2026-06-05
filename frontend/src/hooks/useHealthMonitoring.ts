@@ -200,7 +200,7 @@ export function useHealthMonitoring() {
     }
   }, [health, isLoading, addHealthNotification, clearServiceNotifications]);
   
-  // Handle query errors
+  // Handle query errors / recovery
   useEffect(() => {
     if (isError && error) {
       addHealthNotification({
@@ -210,8 +210,10 @@ export function useHealthMonitoring() {
         serviceName: "Health Monitor",
         serviceCategory: "system",
       });
+    } else if (health && !isLoading) {
+      clearServiceNotifications("Health Monitor");
     }
-  }, [isError, error, addHealthNotification]);
+  }, [isError, error, health, isLoading, addHealthNotification, clearServiceNotifications]);
   
   return {
     isLoading,

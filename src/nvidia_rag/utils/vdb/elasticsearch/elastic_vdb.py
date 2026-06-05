@@ -356,13 +356,61 @@ class ElasticVDB(VDBRagIngest):
         if meta_dataframe is None and self.csv_file_path is not None:
             meta_dataframe = pandas_file_reader(self.csv_file_path)
 
+# safe_add_metadata_patch
         # Clean up and flatten records to pull appropriate fields from the records
-        cleaned_records = cleanup_records(
-            records=records,
-            meta_dataframe=meta_dataframe,
-            meta_source_field=self.meta_source_field,
-            meta_fields=self.meta_fields,
-        )
+        from nv_ingest_client.util import milvus as _milvus_mod
+
+        _orig_add_metadata = _milvus_mod.add_metadata
+
+        def _safe_add_metadata(element, meta_dataframe, meta_source_field, meta_fields):
+            if meta_dataframe is None or meta_source_field is None or not meta_fields:
+                return
+            element_name = element["metadata"]["source_metadata"]["source_name"]
+            candidates = {element_name}
+            base, ext = os.path.splitext(element_name)
+            if ext.lower() == ".pdf":
+                for img_ext in (
+                    ".png",
+                    ".PNG",
+                    ".jpg",
+                    ".jpeg",
+                    ".JPG",
+                    ".JPEG",
+                    ".webp",
+                    ".gif",
+                ):
+                    candidates.add(base + img_ext)
+            elif ext.lower() in {
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".webp",
+                ".gif",
+                ".bmp",
+                ".tiff",
+                ".tif",
+            }:
+                candidates.add(base + ".pdf")
+            df = meta_dataframe[meta_dataframe[meta_source_field].isin(candidates)]
+            if df.shape[0] == 0:
+                logger.debug(
+                    "No custom metadata row for source %s (candidates=%s)",
+                    element_name,
+                    candidates,
+                )
+                return
+            _orig_add_metadata(element, df, meta_source_field, meta_fields)
+
+        _milvus_mod.add_metadata = _safe_add_metadata
+        try:
+            cleaned_records = cleanup_records(
+                records=records,
+                meta_dataframe=meta_dataframe,
+                meta_source_field=self.meta_source_field,
+                meta_fields=self.meta_fields,
+            )
+        finally:
+            _milvus_mod.add_metadata = _orig_add_metadata
 
         # Prepare texts, embeddings, and metadatas from cleaned records
         texts, embeddings, metadatas = [], [], []

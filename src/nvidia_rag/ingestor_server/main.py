@@ -112,6 +112,10 @@ class Mode(str, Enum):
 
 SUPPORTED_FILE_TYPES = set(EXTENSION_TO_DOCUMENT_TYPE.keys()) - set({"svg"})
 
+RASTER_IMAGE_EXTENSIONS = frozenset(
+    {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff", ".tif"}
+)
+
 
 class NvidiaRAGIngestor:
     """
@@ -362,6 +366,10 @@ class NvidiaRAGIngestor:
             files_per_batch=files_per_batch,
         )
         task_id = state_manager.get_task_id()
+
+        filepaths, temp_image_pdfs = await self.__convert_raster_images_to_pdf(filepaths)
+        state_manager.temp_image_pdf_paths = temp_image_pdfs
+        state_manager.filepaths = filepaths
 
         vdb_op, collection_name = self.__prepare_vdb_op_and_collection_name(
             vdb_endpoint=vdb_endpoint,
@@ -768,7 +776,10 @@ class NvidiaRAGIngestor:
             clean_up_files_start_time = time.time()
             if self.mode == Mode.SERVER:
                 logger.info(f"Cleaning up files count: {len(filepaths)}")
-                for file in filepaths:
+                cleanup_paths = list(filepaths) + getattr(
+                    state_manager, "temp_image_pdf_paths", []
+                )
+                for file in cleanup_paths:
                     try:
                         os.remove(file)
                         logger.debug(f"Deleted temporary file: {file}")
@@ -3297,7 +3308,7 @@ class NvidiaRAGIngestor:
         for filepath in filepaths:
             filename = os.path.basename(filepath)
             if (
-                filename not in filenames_in_vdb
+                not self._vdb_lookup_names(filename) & filenames_in_vdb
                 and filename not in failed_documents_filenames
             ):
                 failed_documents.append(
@@ -3317,6 +3328,59 @@ class NvidiaRAGIngestor:
         return failed_documents
 
     @trace_function("ingestor.main.remove_unsupported_files", tracer=TRACER)
+    def _vdb_lookup_names(self, filename: str) -> set[str]:
+        """Return basenames to match in VDB/metadata after image->PDF conversion."""
+        base, ext = os.path.splitext(filename)
+        names = {filename}
+        if ext.lower() in RASTER_IMAGE_EXTENSIONS:
+            names.add(f"{base}.pdf")
+        elif ext.lower() == ".pdf":
+            for img_ext in (
+                ".png",
+                ".PNG",
+                ".jpg",
+                ".jpeg",
+                ".JPG",
+                ".JPEG",
+                ".webp",
+                ".gif",
+            ):
+                names.add(base + img_ext)
+        return names
+
+    async def __convert_raster_images_to_pdf(
+        self, filepaths: list[str]
+    ) -> tuple[list[str], list[str]]:
+        """Convert raster images to single-page PDFs so the PDF OCR pipeline runs."""
+        from PIL import Image
+
+        out_paths: list[str] = []
+        temp_pdfs: list[str] = []
+        for filepath in filepaths:
+            ext = os.path.splitext(filepath)[1].lower()
+            if ext not in RASTER_IMAGE_EXTENSIONS:
+                out_paths.append(filepath)
+                continue
+            pdf_path = f"{os.path.splitext(filepath)[0]}.pdf"
+            try:
+                with Image.open(filepath) as img:
+                    img.convert("RGB").save(pdf_path, "PDF", resolution=150.0)
+                logger.info(
+                    "Converted raster image %s to PDF for OCR ingestion: %s",
+                    filepath,
+                    pdf_path,
+                )
+                out_paths.append(pdf_path)
+                temp_pdfs.append(pdf_path)
+            except Exception as e:
+                logger.error(
+                    "Failed to convert image %s to PDF, ingesting as image: %s",
+                    filepath,
+                    e,
+                )
+                out_paths.append(filepath)
+        return out_paths, temp_pdfs
+
     async def __remove_unsupported_files(
         self,
         filepaths: list[str],
@@ -3378,7 +3442,9 @@ class NvidiaRAGIngestor:
             f"Metadata schema for collection {collection_name}: {metadata_schema_data}"
         )
         # Validate that metadata filenames match the files being ingested
-        filenames = {os.path.basename(filepath) for filepath in filepaths}
+        filenames: set[str] = set()
+        for filepath in filepaths:
+            filenames.update(self._vdb_lookup_names(os.path.basename(filepath)))
 
         # Setup validation if schema exists
         validator = None
@@ -3465,7 +3531,7 @@ class NvidiaRAGIngestor:
         # Check for files without metadata that require it
         for filepath in filepaths:
             filename = os.path.basename(filepath)
-            if filename not in filename_to_metadata:
+            if not self._vdb_lookup_names(filename) & set(filename_to_metadata.keys()):
                 if validator and metadata_schema:
                     required_fields = metadata_schema.required_fields
                     if required_fields:

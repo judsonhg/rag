@@ -1,6 +1,7 @@
 services:
 
   nim-llm:
+    ipc: host
     container_name: nim-llm-ms
     image: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:1.8.0
     volumes:
@@ -16,7 +17,8 @@ services:
       NIM_ENABLE_CHUNKED_PREFILL: "1"
       NIM_KV_CACHE_DTYPE: "fp8"
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
-    shm_size: 20gb
+      VLLM_ENFORCE_EAGER: "1"
+    shm_size: 64gb
     deploy:
       resources:
         reservations:
@@ -42,7 +44,6 @@ services:
     - "8000"
     environment:
       NGC_API_KEY: ${NGC_API_KEY}
-      CUDA_VISIBLE_DEVICES: "4,5"
       NIM_TRT_ENGINE_HOST_CODE_ALLOWED: 1
     user: "${USERID}"
     shm_size: 16GB
@@ -73,7 +74,6 @@ services:
     - "8000"
     environment:
       NGC_API_KEY: ${NGC_API_KEY}
-      CUDA_VISIBLE_DEVICES: "4,5"
     user: "${USERID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/v1/health/ready"]
@@ -268,6 +268,7 @@ services:
       APP_NVINGEST_EXTRACTTABLES: ${APP_NVINGEST_EXTRACTTABLES:-True}
       APP_NVINGEST_EXTRACTCHARTS: ${APP_NVINGEST_EXTRACTCHARTS:-True}
       APP_NVINGEST_EXTRACTIMAGES: ${APP_NVINGEST_EXTRACTIMAGES:-False}
+      APP_NVINGEST_EXTRACTPAGEASIMAGE: ${APP_NVINGEST_EXTRACTPAGEASIMAGE:-False}
       APP_NVINGEST_PDFEXTRACTMETHOD: ${APP_NVINGEST_PDFEXTRACTMETHOD:-None} # Select from pdfium, nemotron_parse, None
       # Extract text by "page" only recommended for documents with pages like .pdf, .docx, etc.
       APP_NVINGEST_TEXTDEPTH: ${APP_NVINGEST_TEXTDEPTH:-page} # extract by "page" or "document"
@@ -351,9 +352,8 @@ services:
       # Audio model not used in this RAG version
       - AUDIO_GRPC_ENDPOINT=audio:50051
       - AUDIO_INFER_PROTOCOL=grpc
-      - CUDA_VISIBLE_DEVICES=0
       - MAX_INGEST_PROCESS_WORKERS=${MAX_INGEST_PROCESS_WORKERS:-16}
-      - INGEST_LOG_LEVEL=WARNING
+      - INGEST_LOG_LEVEL=${INGEST_LOG_LEVEL:-INFO}
       - INGEST_RAY_LOG_LEVEL=PRODUCTION
       - INGEST_EDGE_BUFFER_SIZE=64
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80

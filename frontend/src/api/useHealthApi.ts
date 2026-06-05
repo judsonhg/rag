@@ -30,6 +30,8 @@ export function useHealthStatus() {
       return res.json();
     },
     staleTime: 30 * 1000, // Cache for 30 seconds
-    retry: 1, // Only retry once to avoid delays
+    refetchInterval: 60 * 1000, // Recover after brief ingestor restarts
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 }

@@ -162,7 +162,7 @@ def get_nv_ingest_ingestor(
     # Split text/html/mp3 always; include paged docs (PDF/docx/pptx) only when
     # enable_paged_doc_split is explicitly enabled.
     if split_options is not None:
-        split_source_types = ["text", "html", "mp3"]
+        split_source_types = ["text", "html", "mp3", "png", "PNG", "jpeg", "jpg", "gif", "webp"]
         if config.nv_ingest.enable_paged_doc_split:
             split_source_types.extend(["docx", "pptx", "PDF"])
         logger.info(
