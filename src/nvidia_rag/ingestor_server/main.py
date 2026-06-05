@@ -936,7 +936,7 @@ class NvidiaRAGIngestor:
                     total_elements=total_elements,
                     raw_text_elements_size=raw_text_elements_size,
                 )
-                if total_elements == 0 and vdb_op is not None:
+                if (total_elements == 0 or raw_text_elements_size == 0) and vdb_op is not None:
                     document_info = self._enrich_document_info_from_vdb(
                         vdb_op,
                         state_manager.collection_name,
@@ -964,7 +964,7 @@ class NvidiaRAGIngestor:
                         "filename": filename_to_metadata_map.get(
                             os.path.basename(filepath), {}
                         ).get("filename")
-                        or os.path.basename(filepath),
+                        or display_name,
                     },
                     "document_info": document_info,
                 }
@@ -2459,6 +2459,8 @@ class NvidiaRAGIngestor:
                             page_filter=page_filter,
                             summarization_strategy=summarization_strategy,
                             is_shallow=True,
+                            filepaths=filepaths,
+                            vdb_op=vdb_op,
                         )
                     )
                     self._background_tasks.add(task)
