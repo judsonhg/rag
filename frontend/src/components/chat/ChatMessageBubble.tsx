@@ -75,7 +75,8 @@ const MessageContainer = ({
   <Flex justify={role === "user" ? "end" : "start"}>
     <Panel
       style={{
-        maxWidth: '32rem',
+        maxWidth: role === "user" ? '32rem' : '100%',
+        width: role === "assistant" ? '100%' : 'auto',
         backgroundColor: role === "user" 
           ? 'var(--color-brand)' 
           : isError 

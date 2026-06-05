@@ -36,3 +36,34 @@ html, body {
   max-width: 100%;
   word-wrap: normal;
 }
+/* CHAT_OUTPUT_FORMAT_PATCHED: readable tables and line breaks in chat output */
+.prose table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+}
+
+.prose th,
+.prose td {
+  border: 1px solid color-mix(in srgb, var(--text-color-default) 20%, transparent);
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  text-align: left;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  min-width: 7rem;
+}
+
+.prose th {
+  font-weight: 600;
+  background-color: color-mix(in srgb, var(--background-color-surface-base) 85%, transparent);
+}
+
+.prose thead th:first-child,
+.prose tbody td:first-child {
+  min-width: 9rem;
+}

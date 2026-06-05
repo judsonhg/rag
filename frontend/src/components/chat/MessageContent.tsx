@@ -22,7 +22,7 @@ interface MessageContentProps {
 
 export const MessageContent = ({ 
   content, 
-  className = "prose prose-invert max-w-none text-sm" 
+  className = "prose prose-invert max-w-none text-sm w-full" 
 }: MessageContentProps) => {
   const { renderMarkdown } = useMarkdownRenderer();
 

@@ -28,6 +28,14 @@ interface MarkdownOptions {
 /**
  * Default configuration options for markdown rendering.
  */
+
+/** Normalize LLM HTML fragments before markdown parsing. */
+const normalizeMarkdownContent = (content: string): string =>
+  content
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<p>/gi, "");
+
 const DEFAULT_OPTIONS: MarkdownOptions = {
   async: false,
   breaks: true,
@@ -56,7 +64,7 @@ export const useMarkdownRenderer = (options: MarkdownOptions = {}) => {
   }), [options]);
 
   const renderMarkdown = useMemo(() => (content: string) => 
-    marked.parse(content, mergedOptions), [mergedOptions]);
+    marked.parse(normalizeMarkdownContent(content), mergedOptions), [mergedOptions]);
 
   return { renderMarkdown };
 }; 
