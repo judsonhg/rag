@@ -50,7 +50,10 @@ from typing import Any
 from uuid import uuid4
 
 from nv_ingest_client.primitives.tasks.extract import _DEFAULT_EXTRACTOR_MAP
-from nv_ingest_client.util.file_processing.extract import EXTENSION_TO_DOCUMENT_TYPE
+from nv_ingest_client.util.file_processing.extract import (
+    EXTENSION_TO_DOCUMENT_TYPE,
+    DocumentTypeEnum,
+)
 from nv_ingest_client.util.vdb.adt_vdb import VDB
 from pymilvus import MilvusClient
 
@@ -109,6 +112,10 @@ class Mode(str, Enum):
     SERVER = "server"
     LITE = "lite"
 
+
+# Plain-text and script-like extensions ingested as TXT
+for _text_like_ext in ('out', 'so', 'py', 'log', 'dat', 'in', 'f', 'nc', 'radar', 'bat', 'java'):
+    EXTENSION_TO_DOCUMENT_TYPE[_text_like_ext] = DocumentTypeEnum.TXT
 
 SUPPORTED_FILE_TYPES = set(EXTENSION_TO_DOCUMENT_TYPE.keys()) - set({"svg"})
 

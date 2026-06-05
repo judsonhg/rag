@@ -74,7 +74,7 @@ export const UploaderSection = () => {
       <NvidiaUpload
         onFilesChange={handleFilesChange}
         onValidationChange={handleValidationChange}
-        acceptedTypes={['.bmp', '.docx', '.html', '.jpeg', '.json', '.md', '.pdf', '.png', '.pptx', '.sh', '.tiff', '.txt', '.mp3', '.wav', '.mp4', '.mov', '.avi', '.mkv']}
+        acceptedTypes={['.bat', '.bmp', '.dat', '.docx', '.f', '.html', '.in', '.java', '.jpeg', '.jpg', '.json', '.log', '.md', '.nc', '.out', '.pdf', '.png', '.pptx', '.py', '.radar', '.sh', '.so', '.tiff', '.txt', '.mp3', '.wav', '.mp4', '.mov', '.avi', '.mkv']}
         maxFileSize={400}
       />
       
