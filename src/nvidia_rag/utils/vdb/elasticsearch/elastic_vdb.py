@@ -1206,6 +1206,52 @@ class ElasticVDB(VDBRagIngest):
             if token is not None:
                 otel_context.detach(token)
 
+    def retrieve_chunks_by_source_basename(
+        self,
+        collection_name: str,
+        basename: str,
+        limit: int = 1000,
+    ) -> list[Document]:
+        """Retrieve all chunks whose source path ends with basename (e.g. 1.pdf)."""
+        collection_name = self._normalize_index_name(collection_name)
+        try:
+            query = {
+                "query": {
+                    "wildcard": {
+                        "metadata.source.source_name.keyword": f"*{basename}"
+                    }
+                },
+                "size": min(limit, 10000),
+                "_source": ["text", "metadata"],
+            }
+            response = self._es_connection.search(index=collection_name, body=query)
+        except Exception as e:
+            logger.error("Error in retrieve_chunks_by_source_basename: %s", e)
+            return []
+
+        docs: list[Document] = []
+        for hit in response.get("hits", {}).get("hits", []):
+            source_data = hit.get("_source", {})
+            text_val = source_data.get("text", "")
+            metadata = source_data.get("metadata", {})
+            docs.append(
+                Document(
+                    page_content=text_val,
+                    metadata={
+                        "source": metadata.get("source"),
+                        "content_metadata": metadata.get("content_metadata", {}),
+                    },
+                )
+            )
+        docs.sort(
+            key=lambda d: (
+                d.metadata.get("content_metadata", {}).get("page_number", 0)
+                if d.metadata
+                else 0
+            )
+        )
+        return self._add_collection_name_to_retreived_docs(docs, collection_name)
+
     def retrieve_chunks_by_filter(
         self,
         collection_name: str,

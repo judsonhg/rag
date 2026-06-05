@@ -369,6 +369,17 @@ class NvidiaRAGIngestor:
 
         filepaths, temp_image_pdfs = await self.__convert_raster_images_to_pdf(filepaths)
         state_manager.temp_image_pdf_paths = temp_image_pdfs
+        display_names = getattr(state_manager, "raster_image_display_names", {})
+        for fp in filepaths:
+            ext = os.path.splitext(fp)[1].lower()
+            if ext == ".pdf":
+                base = os.path.splitext(fp)[0]
+                for img_ext in RASTER_IMAGE_EXTENSIONS:
+                    candidate = base + img_ext
+                    if os.path.isfile(candidate):
+                        display_names[os.path.basename(fp)] = os.path.basename(candidate)
+                        break
+        state_manager.raster_image_display_names = display_names
         state_manager.filepaths = filepaths
 
         vdb_op, collection_name = self.__prepare_vdb_op_and_collection_name(
@@ -825,6 +836,44 @@ class NvidiaRAGIngestor:
                         )
             raise e
 
+    def _enrich_document_info_from_vdb(
+        self,
+        vdb_op: VDBRag,
+        collection_name: str,
+        filepath: str,
+        document_info: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Fill document_info from indexed chunks when nv-ingest returned no results."""
+        basename = os.path.basename(filepath)
+        loader = getattr(vdb_op, "retrieve_chunks_by_source_basename", None)
+        if loader is None:
+            return document_info
+        try:
+            chunks = loader(collection_name=collection_name, basename=basename)
+        except Exception as e:
+            logger.warning(
+                "Could not load VDB chunks for document info %s: %s", basename, e
+            )
+            return document_info
+        if not chunks:
+            return document_info
+        text_len = sum(len(c.page_content or "") for c in chunks)
+        preview = " ".join(c.page_content or "" for c in chunks).strip()
+        if preview and not document_info.get("description"):
+            document_info["description"] = preview[:2000]
+        document_info["raw_text_elements_size"] = max(
+            document_info.get("raw_text_elements_size", 0), text_len
+        )
+        document_info["total_elements"] = max(
+            document_info.get("total_elements", 0), len(chunks)
+        )
+        counts = dict(document_info.get("doc_type_counts") or {})
+        if text_len > 0:
+            counts["text"] = counts.get("text", 0) + len(chunks)
+            counts.pop("page_image", None)
+        document_info["doc_type_counts"] = counts
+        return document_info
+
     @trace_function("ingestor.main.build_ingestion_response", tracer=TRACER)
     async def __build_ingestion_response(
         self,
@@ -887,6 +936,13 @@ class NvidiaRAGIngestor:
                     total_elements=total_elements,
                     raw_text_elements_size=raw_text_elements_size,
                 )
+                if total_elements == 0 and vdb_op is not None:
+                    document_info = self._enrich_document_info_from_vdb(
+                        vdb_op,
+                        state_manager.collection_name,
+                        filepath,
+                        document_info,
+                    )
 
                 # Always add document info for each document
                 if not is_final_batch:
@@ -896,9 +952,12 @@ class NvidiaRAGIngestor:
                         document_name=os.path.basename(filepath),
                         info_value=document_info,
                     )
+                display_name = getattr(
+                    state_manager, "raster_image_display_names", {}
+                ).get(os.path.basename(filepath), os.path.basename(filepath))
                 uploaded_document = {
                     "document_id": str(uuid4()),
-                    "document_name": os.path.basename(filepath),
+                    "document_name": display_name,
                     "size_bytes": os.path.getsize(filepath),
                     "metadata": {
                         **filename_to_metadata_map.get(os.path.basename(filepath), {}),
@@ -935,6 +994,8 @@ class NvidiaRAGIngestor:
         page_filter: list[list[int]] | str | None = None,
         summarization_strategy: str | None = None,
         is_shallow: bool = False,
+        filepaths: list[str] | None = None,
+        vdb_op: VDBRag | None = None,
     ) -> None:
         """
         Trigger parallel summary generation for documents with optional page filtering.
@@ -955,6 +1016,8 @@ class NvidiaRAGIngestor:
                 config=self.config,
                 is_shallow=is_shallow,
                 prompts=self.prompts,
+                filepaths=filepaths,
+                vdb_op=vdb_op,
             )
 
             if stats["failed"] > 0:
@@ -2141,6 +2204,8 @@ class NvidiaRAGIngestor:
                     page_filter=page_filter,
                     summarization_strategy=summarization_strategy,
                     is_shallow=True,
+                    filepaths=filepaths,
+                    vdb_op=vdb_op,
                 )
             )
             self._background_tasks.add(task)
@@ -2484,6 +2549,8 @@ class NvidiaRAGIngestor:
                     collection_name=collection_name,
                     page_filter=page_filter,
                     summarization_strategy=summarization_strategy,
+                    filepaths=filepaths,
+                    vdb_op=vdb_op,
                 )
             )
             self._background_tasks.add(task)
@@ -2752,6 +2819,8 @@ class NvidiaRAGIngestor:
                     collection_name=collection_name,
                     page_filter=page_filter,
                     summarization_strategy=summarization_strategy,
+                    filepaths=filepaths,
+                    vdb_op=vdb_op,
                 )
             )
             self._background_tasks.add(task)

@@ -366,6 +366,21 @@ async def release_global_summary_slot() -> None:
         logger.warning(f"Redis error releasing global slot: {e}")
 
 
+
+def _load_document_text_from_vdb(
+    vdb_op: Any,
+    collection_name: str,
+    file_name: str,
+) -> str:
+    """Load indexed text for a document when nv-ingest results were purged."""
+    loader = getattr(vdb_op, "retrieve_chunks_by_source_basename", None)
+    if loader is None:
+        return ""
+    chunks = loader(collection_name=collection_name, basename=file_name)
+    parts = [c.page_content for c in chunks if getattr(c, "page_content", None)]
+    return " ".join(parts).strip()
+
+
 async def generate_document_summaries(
     results: list[list[dict[str, str | dict]]],
     collection_name: str,
@@ -374,6 +389,8 @@ async def generate_document_summaries(
     config: NvidiaRAGConfig | None = None,
     is_shallow: bool = False,
     prompts: dict | None = None,
+    filepaths: list[str] | None = None,
+    vdb_op: Any | None = None,
 ) -> dict[str, Any]:
     """
     Generate summaries for multiple documents in parallel with global rate limiting.
@@ -429,6 +446,25 @@ async def generate_document_summaries(
     if page_filter:
         logger.info(f"Global page filter: {page_filter}")
 
+    if total_files == 0 and filepaths and vdb_op is not None:
+        seen: set[str] = set()
+        for filepath in filepaths:
+            for basename in {os.path.basename(filepath)}:
+                if basename in seen:
+                    continue
+                seen.add(basename)
+                file_results.append(
+                    {
+                        "result_element": {},
+                        "file_name": basename,
+                    }
+                )
+        total_files = len(file_results)
+        logger.info(
+            "No nv-ingest results for summary; using %d filepath(s) with VDB fallback",
+            total_files,
+        )
+
     if total_files == 0:
         logger.warning("No files to summarize")
         return {
@@ -450,6 +486,7 @@ async def generate_document_summaries(
             summarization_strategy=summarization_strategy,
             is_shallow=is_shallow,
             prompts=prompts,
+            vdb_op=vdb_op,
         )
         for file_data in file_results
     ]
@@ -495,6 +532,7 @@ async def _process_single_file_summary(
     summarization_strategy: str | None = None,
     is_shallow: bool = False,
     prompts: dict | None = None,
+    vdb_op: Any | None = None,
 ) -> dict[str, Any]:
     """
     Process summary for a single file with global rate limiting.
@@ -541,6 +579,7 @@ async def _process_single_file_summary(
                 collection_name=collection_name,
                 page_filter=effective_filter,
                 config=config,
+                vdb_op=vdb_op,
             )
 
             progress_callback = partial(
@@ -559,6 +598,22 @@ async def _process_single_file_summary(
             )
 
             await _store_summary_in_object_store(summary_doc, config=config)
+
+            if vdb_op is not None:
+                summary_text = summary_doc.metadata.get("summary", "")
+                if summary_text:
+                    try:
+                        vdb_op.update_document_catalog_metadata(
+                            collection_name,
+                            file_name,
+                            {"description": summary_text[:2000]},
+                        )
+                    except Exception as catalog_err:
+                        logger.warning(
+                            "Could not update catalog description for %s: %s",
+                            file_name,
+                            catalog_err,
+                        )
 
             SUMMARY_STATUS_HANDLER.update_progress(
                 collection_name=collection_name,
@@ -604,6 +659,7 @@ async def _prepare_single_document(
     collection_name: str,
     config: NvidiaRAGConfig,
     page_filter: list[list[int]] | str | None = None,
+    vdb_op: Any | None = None,
 ) -> Document:
     """Prepare document for summarization by loading content with optional page filtering.
 
@@ -647,6 +703,12 @@ async def _prepare_single_document(
                 if content:
                     pages_data.append((page_num, content))
                     seen_pages.add(page_num)
+
+    if not pages_data and vdb_op is not None:
+        vdb_text = _load_document_text_from_vdb(vdb_op, collection_name, file_name)
+        if vdb_text:
+            pages_data = [(1, vdb_text)]
+            seen_pages = {1}
 
     if not pages_data:
         raise ValueError(f"No content found in document '{file_name}'")
