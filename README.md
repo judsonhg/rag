@@ -1,4 +1,4 @@
-<h1>NVIDIA RAG Blueprint</h1>
+<h1>Custom RAG Blueprint for Federal Exploit Ingest</h1>
 
 Retrieval-Augmented Generation (RAG) combines the reasoning power of large language models (LLMs)
 with real-time retrieval from trusted data sources for TCAT. 
