@@ -22,9 +22,9 @@ vi.mock('../../notifications/NotificationBell', () => ({
   default: () => <div data-testid="notification-bell">Bell</div>
 }));
 
-// Mock NvidiaLogo component
-vi.mock('../../icons/NvidiaLogo', () => ({
-  default: () => <svg data-testid="nv-logo-element">Logo</svg>
+// Mock ThunderCatLogo component
+vi.mock('../../icons/ThunderCatLogo', () => ({
+  default: () => <img data-testid="tcat-logo-element" alt="ThunderCat Logo" />
 }));
 
 describe('Header', () => {
@@ -38,7 +38,7 @@ describe('Header', () => {
       render(<Header />);
       
       expect(screen.getByTestId('nv-logo-element')).toBeInTheDocument();
-      expect(screen.getByText('RAG Blueprint')).toBeInTheDocument();
+      expect(screen.getByText('Data Explorer')).toBeInTheDocument();
     });
 
     it('renders notification bell', () => {
@@ -57,7 +57,7 @@ describe('Header', () => {
       render(<Header />);
       
       expect(screen.getByTestId('nv-logo-element')).toBeInTheDocument();
-      expect(screen.getByText('RAG Blueprint')).toBeInTheDocument();
+      expect(screen.getByText('Data Explorer')).toBeInTheDocument();
     });
 
     it('navigates to settings when on home page', () => {

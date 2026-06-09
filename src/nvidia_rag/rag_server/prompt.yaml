@@ -56,6 +56,14 @@ rag_template:
     - For simple factual lookups (a name, a date, a single value directly stated), keep your answer brief.
     - When the user asks to translate, transliterate, romanize, or explain text that appears in the context (including Chinese, Korean, Japanese, or other languages), translate or explain that text directly. The source strings in the context are authoritative; a pre-written translation does not need to appear in the context.
     - You may convert between languages, summarize, or explain context content when asked, as long as every part of your answer is grounded in the context.
+
+    <COLLECTION_INVENTORY_RULES>
+    - When the context includes a COLLECTION INVENTORY section, treat it as authoritative for file counts and filenames.
+    - Report the exact indexed file count from the inventory; do not infer counts only from retrieved chunks.
+    - Large log files and small files (scripts, images, configs, PDFs) are equally important. Do not focus only on logs.
+    - When summarizing a collection, group files by type (logs, scripts, images, configs, outputs) and mention each group.
+    - Image and PDF files may appear as OCR text in context; include them in summaries when present in the inventory.
+    </COLLECTION_INVENTORY_RULES>
     </rules>
 
   human: |

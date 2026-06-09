@@ -60,6 +60,12 @@ from nvidia_rag.rag_server.reflection import (
     check_context_relevance,
     check_response_groundedness,
 )
+from nvidia_rag.rag_server.retrieval_diversity import (
+    build_collection_catalog_text,
+    diversify_documents_by_source,
+    should_inject_catalog,
+    supplement_underrepresented_files,
+)
 from nvidia_rag.rag_server.response_generator import (
     APIError,
     Citations,
@@ -3508,6 +3514,14 @@ class NvidiaRAG:
                 )
                 logger.info("-" * 80)
 
+
+            context_to_show, catalog_context_prefix = self._apply_retrieval_diversity_and_catalog(
+                context_to_show,
+                vdb_op=vdb_op,
+                collection_names=validated_collections,
+                query=processed_query,
+            )
+
             # Snapshot for citations: only retrieved (and filtered) chunks, not expanded context.
             docs_for_citations = list(context_to_show)
 
@@ -3657,6 +3671,10 @@ class NvidiaRAG:
                                     for d in context_to_show
                                 ]
                             )
+
+                        if catalog_context_prefix:
+                            vlm_text_context = catalog_context_prefix + "\n\n" + vlm_text_context
+
                         self._log_context_structure(
                             vlm_text_context, "VLM text context structure"
                         )
@@ -3765,6 +3783,10 @@ class NvidiaRAG:
                 docs = "\n\n".join(
                     self._format_document_with_source(d) for d in context_to_show
                 )
+            if catalog_context_prefix:
+                docs = catalog_context_prefix + "\n\n" + docs
+
+
 
             logger.info("=" * 80)
             logger.info("STAGE: Context Preparation for LLM")
@@ -4123,6 +4145,34 @@ class NvidiaRAG:
                 logger.debug("Role: %s", role)
                 logger.debug("Content: %s\n", content)
 
+
+    def _apply_retrieval_diversity_and_catalog(
+        self,
+        documents: list[Document],
+        *,
+        vdb_op: Any,
+        collection_names: list[str],
+        query: str,
+    ) -> tuple[list[Document], str]:
+        """Balance chunks across files and build optional catalog prefix."""
+        target_total = len(documents)
+        diversified = diversify_documents_by_source(documents, target_total=target_total)
+        diversified = supplement_underrepresented_files(
+            diversified,
+            vdb_op,
+            collection_names,
+            target_total=target_total,
+        )
+        catalog_text = ""
+        if should_inject_catalog(query, collection_names, vdb_op):
+            catalog_text = build_collection_catalog_text(vdb_op, collection_names)
+            if catalog_text:
+                logger.info(
+                    "Injecting collection catalog (%d chars) for query: %s",
+                    len(catalog_text),
+                    (query or "")[:120],
+                )
+        return diversified, catalog_text
     def _normalize_relevance_scores(
         self, documents: list["Document"]
     ) -> list["Document"]:

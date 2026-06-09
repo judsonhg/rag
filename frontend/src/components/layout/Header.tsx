@@ -15,7 +15,7 @@
 
 import { AppBar, Button, Text, Flex } from "@kui/react";
 import NotificationBell from "../notifications/NotificationBell";
-import NvidiaLogo from "../icons/NvidiaLogo";
+import ThunderCatLogo from "../icons/ThunderCatLogo";
 import { useNavigate, useLocation } from "react-router-dom";
 
 // Using placeholder icon as suggested
@@ -35,7 +35,7 @@ const ICON_settings = () => (
 /**
  * Application header component with navigation and branding.
  * 
- * Uses KUI AppBar component with integrated NVIDIA branding,
+ * Uses KUI AppBar component with integrated ThunderCat branding,
  * application title, and navigation elements including settings button
  * and notification bell. Handles routing between different sections.
  * 
@@ -62,10 +62,10 @@ export default function Header() {
       slotLeft={
         <Flex align="center" gap="density-md">
           <div onClick={handleLogoClick} style={{ cursor: 'pointer' }}>
-            <NvidiaLogo height="20px" />
+            <ThunderCatLogo height="14px" />
           </div>
           <Text kind="title/xs" onClick={handleLogoClick} style={{ cursor: 'pointer' }}>
-            RAG Blueprint
+            Data Explorer
           </Text>
         </Flex>
       }
